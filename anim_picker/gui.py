@@ -2703,7 +2703,22 @@ class PickerItem(DefaultPolygon):
     def select_associated_controls(self, modifier=None):
         '''Will select maya associated controls
         '''       
-        maya_handlers.select_nodes(self.get_controls(),
+        controls = self.get_controls()[:]
+        
+        if not self.main_window._mirror_selected:
+            maya_handlers.select_nodes(controls,
+                                       modifier=modifier)
+            return
+        
+        # Parse controls
+        result_controls = controls[:]
+        for i in range(len(controls)):
+            for search, replace in [(':L_', ':R_'), (':R_', ':L_'), ('^L_', 'R_'), ('^R_', 'L_')]:
+                mirror_control = re.sub(search, replace, controls[i])
+                if cmds.objExists(mirror_control):
+                    result_controls.append(mirror_control)
+        
+        maya_handlers.select_nodes(result_controls,
                                    modifier=modifier)
     
     def replace_controls_selection(self):
@@ -3959,6 +3974,8 @@ class MainDockWindow(QtGui.QDockWidget):
         QtGui.QDockWidget.__init__(self, parent)
         
         self.parent =   parent
+        
+        self._mirror_selected = False
                 
         # Window size
         #(default size to provide a 450/700 for tab area and propoer image size)
@@ -4040,6 +4057,11 @@ class MainDockWindow(QtGui.QDockWidget):
         # Add option buttons
         btns_layout = QtGui.QHBoxLayout()
         box_layout.addLayout(btns_layout)
+        
+        # Add mirror checkbox
+        self.mirror_checkbox = QtGui.QCheckBox('Select Mirror Items', self)
+        self.mirror_checkbox.clicked.connect(self.mirror_checkbox_event)
+        btns_layout.addWidget(self.mirror_checkbox)
         
         # Add horizont spacer
         spacer = QtGui.QSpacerItem(10,0, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
@@ -4264,6 +4286,12 @@ class MainDockWindow(QtGui.QDockWidget):
             index = i
             break
         self.char_selector_cb.setCurrentIndex(index)
+
+    def mirror_checkbox_event(self, event=None):
+        if self.mirror_checkbox.isChecked():
+            self._mirror_selected = True
+        else:
+            self._mirror_selected = False
         
     def new_character(self):
         '''
